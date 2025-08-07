@@ -45,5 +45,5 @@ def train(args):
 if __name__ == '__main__':
     args = get_args()
     args.headless = True
-    args.num_envs = 4096
+    args.num_envs = 8192
     train(args)
