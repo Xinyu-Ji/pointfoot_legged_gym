@@ -174,8 +174,13 @@ class PointFoot:
         self.common_step_counter += 1
 
         # prepare quantities
+
         self.base_quat[:] = self.root_states[:, 3:7]
-        self.base_lin_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])
+        # self.base_lin_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])
+        self.base_position = self.root_states[:, 0:3]
+        self.base_lin_vel = (self.base_position - self.last_base_position) / self.dt
+        self.base_lin_vel[:] = quat_rotate_inverse(self.base_quat, self.base_lin_vel)
+
         self.base_ang_vel[:] = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
         self.projected_gravity[:] = quat_rotate_inverse(self.base_quat, self.gravity_vec)
         if self.cfg.terrain.measure_heights_actor or self.cfg.terrain.measure_heights_critic:
@@ -193,7 +198,9 @@ class PointFoot:
 
         # self._update_info()
         # 加入动作平滑项
+
         self.last_last_actions[:] = self.last_actions[:]
+        self.last_base_position[:] = self.base_position[:]
         self.last_actions[:] = self.actions[:]
         self.last_dof_vel[:] = self.dof_vel[:]
         self.last_root_vel[:] = self.root_states[:, 7:13]
@@ -242,6 +249,7 @@ class PointFoot:
         self._resample(env_ids)
 
         self._reset_buffers(env_ids)
+        self.last_base_position[env_ids] = self.base_position[env_ids]
         # fill extras
         self.extras["episode"] = {}
         for key in self.episode_sums.keys():
@@ -268,6 +276,7 @@ class PointFoot:
         self.last_max_feet_height[env_ids] = 0.
         self.episode_length_buf[env_ids] = 0
         self.reset_buf[env_ids] = 1
+
 
     def compute_reward(self):
         """ Compute rewards
@@ -751,7 +760,8 @@ class PointFoot:
         self.rigid_body_external_torques = torch.zeros(
             (self.num_envs, self.num_bodies, 3), device=self.device, requires_grad=False
         )
-
+        self.base_position = self.root_states[:, :3]
+        self.last_base_position = self.base_position.clone()
         self.base_lin_vel = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])
         self.base_ang_vel = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
         self.projected_gravity = quat_rotate_inverse(self.base_quat, self.gravity_vec)
