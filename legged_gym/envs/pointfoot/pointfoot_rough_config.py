@@ -156,7 +156,7 @@ class PointFootRoughCfg(BaseConfig):
             # tracking_base_height = 1.0
 
 
-        base_height_target = 0.62
+        base_height_target = 0.56
         soft_dof_pos_limit = 0.95  # percentage of urdf limits, values above this limit are penalized
         soft_dof_vel_limit = 0.9
         soft_torque_limit = 0.8
