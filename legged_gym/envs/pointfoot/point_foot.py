@@ -1227,3 +1227,6 @@ class PointFoot:
     def _reward_action_smooth(self):
         # Penalize changes in actions
         return torch.sum(torch.square(self.actions-2*self.last_actions+ self.last_last_actions), dim=1)
+
+    def _reward_lin_vel_z(self):
+        return torch.square(self.base_lin_vel[:,2])

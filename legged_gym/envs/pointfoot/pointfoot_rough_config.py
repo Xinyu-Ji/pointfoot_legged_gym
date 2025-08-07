@@ -91,7 +91,7 @@ class PointFootRoughCfg(BaseConfig):
             "foot_R_Joint": 0.0,
         }  # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle
-        action_scale = 0.5
+        action_scale = 0.25
         # decimation: Number of control action updates @ sim DT per policy DT
         decimation = 4
 
@@ -140,8 +140,8 @@ class PointFootRoughCfg(BaseConfig):
         class scales:
             action_rate = -0.01
             ang_vel_xy = -0.05
-            base_height = -0.5
-            collision = -20.0
+            base_height = -0.1
+            collision = -0.02
             dof_acc = -2.5e-07
             feet_air_time = 0.0
             torque_limits = -0.1
@@ -152,6 +152,7 @@ class PointFootRoughCfg(BaseConfig):
             tracking_lin_vel = 1.0
             tracking_ang_vel = 0.5
             action_smooth = -0.1
+            lin_vel_z = -0.5
             # tracking_base_height = 1.0
 
 
