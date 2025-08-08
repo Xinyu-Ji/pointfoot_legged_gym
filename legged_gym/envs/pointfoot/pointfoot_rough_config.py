@@ -143,7 +143,7 @@ class PointFootRoughCfg(BaseConfig):
             base_height = -0.1
             collision = -0.02
             dof_acc = -2.5e-07
-            feet_air_time = 0.0
+            feet_air_time = 0.02
             torque_limits = -0.1
             torques = -2.5e-05
             feet_distance = -100
