@@ -52,7 +52,7 @@ class PointFootRoughCfg(BaseConfig):
             # base_height_target = [0.62, 0.6]  # min max [m]
 
     class init_state:
-        pos = [0.0, 0.0, 0.62]  # x,y,z [m]
+        pos = [0.0, 0.0, 0.80]  # x,y,z [m]
         rot = [0.0, 0.0, 0.0, 1.0]  # x,y,z,w [quat]
         lin_vel = [0.0, 0.0, 0.0]  # x,y,z [m/s]
         ang_vel = [0.0, 0.0, 0.0]  # x,y,z [rad/s]
@@ -156,7 +156,7 @@ class PointFootRoughCfg(BaseConfig):
             # tracking_base_height = 1.0
 
 
-        base_height_target = 0.56
+        base_height_target = 0.62
         soft_dof_pos_limit = 0.95  # percentage of urdf limits, values above this limit are penalized
         soft_dof_vel_limit = 0.9
         soft_torque_limit = 0.8
