@@ -91,7 +91,7 @@ class PointFootRoughCfg(BaseConfig):
             "foot_R_Joint": 0.0,
         }  # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle
-        action_scale = 0.25
+        action_scale = 0.20
         # decimation: Number of control action updates @ sim DT per policy DT
         decimation = 4
 
