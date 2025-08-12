@@ -186,7 +186,7 @@ class PointFoot:
         if self.cfg.terrain.measure_heights_actor or self.cfg.terrain.measure_heights_critic:
             self.measured_heights = self._get_heights()
         self._compute_feet_states()
-
+        self._compute_foot_states()
         self._post_physics_step_callback()
 
         # compute observations, rewards, resets, ...
@@ -204,6 +204,7 @@ class PointFoot:
         self.last_actions[:] = self.actions[:]
         self.last_dof_vel[:] = self.dof_vel[:]
         self.last_root_vel[:] = self.root_states[:, 7:13]
+        self.last_foot_positions[:] = self.foot_positions[:]
 
         if self.viewer and self.enable_viewer_sync and self.debug_viz:
             self._draw_debug_vis()
@@ -249,7 +250,7 @@ class PointFoot:
         self._resample(env_ids)
 
         self._reset_buffers(env_ids)
-        self.last_base_position[env_ids] = self.base_position[env_ids]
+
         # fill extras
         self.extras["episode"] = {}
         for key in self.episode_sums.keys():
@@ -275,6 +276,8 @@ class PointFoot:
         self.current_max_feet_height[env_ids] = 0.
         self.last_max_feet_height[env_ids] = 0.
         self.episode_length_buf[env_ids] = 0
+        self.last_base_position[env_ids] = self.base_position[env_ids]
+        self.last_foot_positions[env_ids] = self.foot_positions[env_ids]
         self.reset_buf[env_ids] = 1
 
 
@@ -711,6 +714,15 @@ class PointFoot:
             self.num_envs, self.num_bodies, -1
         )
         self.feet_state = self.rigid_body_states[:, self.feet_indices, :]
+        # 添加
+        self.foot_positions = self.rigid_body_states.view(
+            self.num_envs, self.num_bodies, 13
+        )[:, self.feet_indices, 0:3]
+        self.last_foot_positions = torch.zeros_like(self.foot_positions)
+        self.foot_heights = torch.zeros_like(self.foot_positions)
+        self.foot_velocities = torch.zeros_like(self.foot_positions)
+        self.foot_velocities_f = torch.zeros_like(self.foot_positions)
+        self.foot_relative_velocities = torch.zeros_like(self.foot_velocities)
 
         self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(self.num_envs, -1,
                                                                             3)  # shape: num_envs, num_bodies, xyz axis
@@ -1122,6 +1134,46 @@ class PointFoot:
         self.first_contact = (self.feet_air_time > 0.) * self.contact_filt
         self.feet_air_time += self.dt
 
+    def _compute_foot_states(self):
+        self.feet_state = self.rigid_body_states[:, self.feet_indices, :]
+        self.foot_quat = self.rigid_body_states.view(self.num_envs, self.num_bodies, 13)[:, self.feet_indices, 3:7]
+        self.foot_positions = self.rigid_body_states.view(self.num_envs, self.num_bodies, 13)[:, self.feet_indices, 0:3]
+        self.foot_velocities = (self.foot_positions - self.last_foot_positions) / self.dt
+
+        self.foot_ang_vel = self.rigid_body_states.view(
+            self.num_envs, self.num_bodies, 13
+        )[:, self.feet_indices, 10:13]
+
+        for i in range(len(self.feet_indices)):
+            self.foot_ang_vel[:, i] = quat_rotate_inverse(
+                self.foot_quat[:, i], self.foot_ang_vel[:, i]
+            )
+            self.foot_velocities_f[:, i] = quat_rotate_inverse(
+                self.foot_quat[:, i], self.foot_velocities[:, i]
+            )
+
+        foot_relative_velocities = (
+                self.foot_velocities
+                - (self.base_position - self.last_base_position)
+                .unsqueeze(1)
+                .repeat(1, len(self.feet_indices), 1)
+                / self.dt
+        )
+        for i in range(len(self.feet_indices)):
+            self.foot_relative_velocities[:, i, :] = quat_rotate_inverse(
+                self.base_quat, foot_relative_velocities[:, i, :]
+            )
+        self.foot_heights = torch.clip(
+            (
+                    self.foot_positions[:, :, 2]
+                    - self.cfg.asset.foot_radius
+                    - self._get_heights_below_foot()
+            ),
+            0,
+            1,
+        )
+
+
     # ------------ reward functions----------------
     def _reward_ang_vel_xy(self):
         # Penalize xy axes base angular velocity
@@ -1230,3 +1282,28 @@ class PointFoot:
 
     def _reward_lin_vel_z(self):
         return torch.square(self.base_lin_vel[:,2])
+
+    # 加入步态，取消base_height
+    def _reward_feet_height(self):
+        feet_height = self.cfg.rewards.base_height_target * 0.05
+
+        # penalize stand still
+        reward = torch.sum(
+            torch.exp(-self.foot_heights / feet_height)
+            * torch.exp(-torch.norm(self.commands[:, :3], dim=1, keepdim=True)).repeat(1, len(self.feet_indices)),
+            dim=1,
+        )
+
+        reward += torch.sum(
+            torch.exp(-self.foot_heights / feet_height)
+            * torch.square(torch.norm(self.foot_velocities[:, :, :2], dim=-1)),
+            dim=1,
+        )
+        feet_height *= 0.5
+        reward += torch.sum(
+            torch.exp(-self.foot_heights / feet_height)
+            * torch.square(torch.abs(self.foot_velocities[:, :, 2])),
+            dim=1,
+        )
+
+        return reward

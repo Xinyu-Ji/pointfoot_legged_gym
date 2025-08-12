@@ -107,6 +107,7 @@ class PointFootRoughCfg(BaseConfig):
         file = '{LEGGED_GYM_ROOT_DIR}/resources/robots/pointfoot/PF_TRON1A/urdf/robot.urdf'
         name = "PF_TRON1A"
         foot_name = 'foot'
+        foot_radius = 0.03
         terminate_after_contacts_on = ["abad", "base"]
         penalize_contacts_on = ["base", "abad", "hip", "knee"]
         disable_gravity = False
@@ -140,7 +141,7 @@ class PointFootRoughCfg(BaseConfig):
         class scales:
             action_rate = -0.01
             ang_vel_xy = -0.05
-            base_height = -1.0
+            base_height = -0.0
             collision = -0.02
             dof_acc = -2.5e-07
             feet_air_time = 0.10
@@ -153,6 +154,7 @@ class PointFootRoughCfg(BaseConfig):
             tracking_ang_vel = 1.0
             action_smooth = -0.1
             lin_vel_z = -0.5
+            feet_height = -0.1
             # tracking_base_height = 1.0
 
 
