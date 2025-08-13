@@ -280,7 +280,6 @@ class PointFoot:
         self.last_foot_positions[env_ids] = self.foot_positions[env_ids]
         self.reset_buf[env_ids] = 1
 
-
     def compute_reward(self):
         """ Compute rewards
             Calls each reward function which had a non-zero scale (processed in self._prepare_reward_function())
@@ -307,6 +306,50 @@ class PointFoot:
         self.compute_privileged_observations()
 
         self._add_noise_to_obs()
+    #加入步态引导
+    def _get_phase(self):
+        cycle_time = self.cfg.rewards.cycle_time
+        phase = self.episode_length_buf * self.dt / cycle_time
+        return phase
+
+    def _get_gait_phase(self):
+        # return float mask 1 is stance, 0 is swing
+        phase = self._get_phase()
+        sin_pos = torch.sin(2 * torch.pi * phase +  self.random_half_phase[0])
+        # Add double support phase
+        stance_mask = torch.zeros((self.num_envs, 2), device=self.device)
+        # left foot stance
+        stance_mask[:, 0] = sin_pos >= 0
+        # right foot stance
+        stance_mask[:, 1] = sin_pos < 0
+        # Double support phase
+        stance_mask[torch.abs(sin_pos) < 0.1] = 1
+
+        return stance_mask
+
+    def compute_ref_state(self):
+        phase = self._get_phase()
+        sin_pos = torch.sin(2 * torch.pi * phase +  self.random_half_phase[0])
+        sin_pos_l = sin_pos.clone()
+        sin_pos_r = sin_pos.clone()
+        self.ref_dof_pos = torch.zeros_like(self.dof_pos)
+        scale_1 = self.cfg.rewards.target_joint_pos_scale
+        scale_2 = 2 * scale_1
+        # left foot stance phase set to default joint pos
+        sin_pos_l[sin_pos_l > 0] = 0
+        self.ref_dof_pos[:, 0] = sin_pos_l * scale_1
+        self.ref_dof_pos[:, 3] = -sin_pos_l * scale_2
+        self.ref_dof_pos[:, 4] = sin_pos_l * scale_1
+        # right foot stance phase set to default joint pos
+        sin_pos_r[sin_pos_r < 0] = 0
+        self.ref_dof_pos[:, 6] = -sin_pos_r * scale_1
+        self.ref_dof_pos[:, 9] = sin_pos_r * scale_2
+        self.ref_dof_pos[:, 10] = -sin_pos_r * scale_1
+        # Double support phase
+        self.ref_dof_pos[torch.abs(sin_pos) < 0.1] = 0
+
+        self.ref_action = 2 * self.ref_dof_pos
+
 
     def _add_noise_to_obs(self):
         # add noise if needed
@@ -330,13 +373,31 @@ class PointFoot:
                     f"privileged_obs_buf size ({self.privileged_obs_buf.shape[1]}) does not match num_privileged_obs ({self.num_privileged_obs})")
 
     def _compose_privileged_obs_buf_no_height_measure(self):
+        phase = self._get_phase()
+        self.compute_ref_state()
+
+        sin_pos = torch.sin(2 * torch.pi * phase + self.random_half_phase[0]).unsqueeze(1)
+        cos_pos = torch.cos(2 * torch.pi * phase + self.random_half_phase[0]).unsqueeze(1)
+
+        stance_mask = self._get_gait_phase()
+        contact_mask = self.contact_forces[:, self.feet_indices, 2] > 5.0
+        # 这里将遥控指令commands代码写在这里面
+        # 在这添加的是步态和遥控指令
+        self.command_input = torch.cat(
+            (sin_pos, cos_pos, self.commands[:, :3] * self.commands_scale), dim=1
+        )
+        diff = self.dof_pos - self.ref_dof_pos
+
         self.privileged_obs_buf = torch.cat((self.base_lin_vel * self.obs_scales.lin_vel,
                                               self.base_ang_vel * self.obs_scales.ang_vel,
                                              self.projected_gravity,
                                              (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
                                              self.dof_vel * self.obs_scales.dof_vel,
                                              self.actions,
-                                             self.commands[:, :3] * self.commands_scale,
+                                             diff,
+                                             self.command_input,
+                                             stance_mask,  # 2
+                                             contact_mask,  # 2
                                              ), dim=-1)
 
     def compute_proprioceptive_observations(self):
@@ -368,7 +429,8 @@ class PointFoot:
 
         You can add more observations here if needed.
         '''
-        self.proprioceptive_obs_buf = torch.cat((self.base_ang_vel * self.obs_scales.ang_vel,
+        self.proprioceptive_obs_buf = torch.cat(( self.command_input,
+                                                 self.base_ang_vel * self.obs_scales.ang_vel,
                                                  self.projected_gravity,
                                                  (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
                                                  self.dof_vel * self.obs_scales.dof_vel,
