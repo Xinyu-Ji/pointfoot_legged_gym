@@ -325,9 +325,10 @@ class PointFoot:
             if self.privileged_obs_buf.shape[1] != self.num_privileged_obs:
                 raise RuntimeError(
                     f"privileged_obs_buf size ({self.privileged_obs_buf.shape[1]}) does not match num_privileged_obs ({self.num_privileged_obs})")
-
+    # 添加特权信息，提高评价网络的评估能力
     def _compose_privileged_obs_buf_no_height_measure(self):
-        self.privileged_obs_buf = torch.cat((self.base_ang_vel * self.obs_scales.ang_vel,
+        self.privileged_obs_buf = torch.cat((self.base_lin_vel * self.obs_scales.lin_vel,
+                                             self.base_ang_vel * self.obs_scales.ang_vel,
                                              self.projected_gravity,
                                              (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
                                              self.dof_vel * self.obs_scales.dof_vel,
@@ -350,7 +351,7 @@ class PointFoot:
             (buf, heights), dim=-1
         )
         return buf
-
+    # 添加历史信息，提高动作网络的能力
     def _compose_proprioceptive_obs_buf_no_height_measure(self):
         '''
         This function is used to compose the proprioceptive observations.
@@ -364,7 +365,8 @@ class PointFoot:
 
         You can add more observations here if needed.
         '''
-        self.proprioceptive_obs_buf = torch.cat((self.base_ang_vel * self.obs_scales.ang_vel,
+        self.proprioceptive_obs_buf = torch.cat((
+                                                 self.base_ang_vel * self.obs_scales.ang_vel,
                                                  self.projected_gravity,
                                                  (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
                                                  self.dof_vel * self.obs_scales.dof_vel,
