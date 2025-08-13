@@ -154,7 +154,7 @@ class PointFootRoughCfg(BaseConfig):
             tracking_ang_vel = 1.0
             action_smooth = -0.1
             lin_vel_z = -0.5
-            feet_height = -0.1
+            feet_height = -0.0
             # tracking_base_height = 1.0
 
 
