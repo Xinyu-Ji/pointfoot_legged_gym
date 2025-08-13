@@ -330,7 +330,8 @@ class PointFoot:
                     f"privileged_obs_buf size ({self.privileged_obs_buf.shape[1]}) does not match num_privileged_obs ({self.num_privileged_obs})")
 
     def _compose_privileged_obs_buf_no_height_measure(self):
-        self.privileged_obs_buf = torch.cat((self.base_ang_vel * self.obs_scales.ang_vel,
+        self.privileged_obs_buf = torch.cat((self.base_lin_vel * self.obs_scales.lin_vel,
+                                              self.base_ang_vel * self.obs_scales.ang_vel,
                                              self.projected_gravity,
                                              (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
                                              self.dof_vel * self.obs_scales.dof_vel,
