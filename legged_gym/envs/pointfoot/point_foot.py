@@ -469,10 +469,41 @@ class PointFoot:
             props[0].mass += np.random.uniform(rng[0], rng[1])
             self.base_mass[env_id] = props[0].mass
         if self.cfg.domain_rand.randomize_base_com:
-            com_x, com_y, com_z = self.cfg.domain_rand.rand_com_vec
-            props[0].com.x += np.random.uniform(-com_x, com_x)
-            props[0].com.y += np.random.uniform(-com_y, com_y)
-            props[0].com.z += np.random.uniform(-com_z, com_z)
+            if env_id == 0:
+                com_x, com_y, com_z = self.cfg.domain_rand.rand_com_vec
+                self.base_com[:, 0] = (
+                        torch.rand(
+                            self.num_envs,
+                            dtype=torch.float,
+                            device=self.device,
+                            requires_grad=False,
+                        )
+                        * (com_x * 2)
+                        - com_x
+                )
+                self.base_com[:, 1] = (
+                        torch.rand(
+                            self.num_envs,
+                            dtype=torch.float,
+                            device=self.device,
+                            requires_grad=False,
+                        )
+                        * (com_y * 2)
+                        - com_y
+                )
+                self.base_com[:, 2] = (
+                        torch.rand(
+                            self.num_envs,
+                            dtype=torch.float,
+                            device=self.device,
+                            requires_grad=False,
+                        )
+                        * (com_z * 2)
+                        - com_z
+                )
+            props[0].com.x += self.base_com[env_id, 0]
+            props[0].com.y += self.base_com[env_id, 1]
+            props[0].com.z += self.base_com[env_id, 2]
         return props
 
     def _post_physics_step_callback(self):
@@ -923,7 +954,9 @@ class PointFoot:
         self.base_mass = torch.zeros(
             self.num_envs, dtype=torch.float, device=self.device, requires_grad=False
         )
-
+        self.base_com = torch.zeros(
+            self.num_envs, 3, dtype=torch.float, device=self.device, requires_grad=False
+        )
         self._get_env_origins()
         env_lower = gymapi.Vec3(0., 0., 0.)
         env_upper = gymapi.Vec3(0., 0., 0.)
