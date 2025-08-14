@@ -277,7 +277,6 @@ class PointFoot:
         self.episode_length_buf[env_ids] = 0
         self.reset_buf[env_ids] = 1
 
-
     def compute_reward(self):
         """ Compute rewards
             Calls each reward function which had a non-zero scale (processed in self._prepare_reward_function())
@@ -327,13 +326,18 @@ class PointFoot:
                     f"privileged_obs_buf size ({self.privileged_obs_buf.shape[1]}) does not match num_privileged_obs ({self.num_privileged_obs})")
     # 添加特权信息，提高评价网络的评估能力
     def _compose_privileged_obs_buf_no_height_measure(self):
-        self.privileged_obs_buf = torch.cat((self.base_lin_vel * self.obs_scales.lin_vel,
+        self.privileged_obs_buf = torch.cat((
+                                             self.base_lin_vel * self.obs_scales.lin_vel,
                                              self.base_ang_vel * self.obs_scales.ang_vel,
                                              self.projected_gravity,
                                              (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
                                              self.dof_vel * self.obs_scales.dof_vel,
                                              self.actions,
                                              self.commands[:, :3] * self.commands_scale,
+                                             self.base_com, ##添加惯性坐标系的偏移量 3
+                                             (self.base_mass - self.base_mass.mean()).view(self.num_envs, 1),#添加重量随机化 1
+                                             self.friction_coeffs.view(self.num_envs,1),#添加摩擦力     1
+                                             # self.restitution_coef.view(self.num_envs, 1),#添加
                                              ), dim=-1)
 
     def compute_proprioceptive_observations(self):
